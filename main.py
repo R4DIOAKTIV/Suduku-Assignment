@@ -232,6 +232,7 @@ class Sudoku:
         self.grid = [list(map(int, puzzle[i:i+9])) for i in range(0, 81, 9)]
         self.initialize_domains()
 
+
 if __name__ == "__main__":
     grid = [[0, 0, 3, 0, 0, 0, 0, 0, 0],
         [8, 0, 9, 4, 6, 0, 7, 0, 2],
