@@ -1,153 +1,255 @@
-import random
-
-class Variable:
-    def __init__(self, row, col):
-        self.row = row
-        self.col = col
-        self.domain = list(range(1, 10))
-        self.neighbors = self.get_neighbors(self)
-
-    def __repr__(self):
-        return f"Variable({self.row}, {self.col}, {self.domain})"
-    
-    def get_neighbors(self):
-        neighbors = []
-        for i in range(9):
-            if i != self.col:
-                neighbors.append(self.variables[var.row][i])
-            if i != var.row:
-                neighbors.append(self.variables[i][var.col])
-        start_row, start_col = 3 * (var.row // 3), 3 * (var.col // 3)
-        for i in range(3):
-            for j in range(3):
-                if start_row + i != var.row and start_col + j != var.col:
-                    neighbors.append(self.variables[start_row + i][start_col + j])
-        return neighbors
-
+from dokusan import generators
+import copy
 class Sudoku:
-    def __init__(self):
-        self.initialize_variables()
-        self.generate_board()
+    """
+    Represents a Sudoku puzzle.
 
-    def initialize_variables(self):
-        self.variables = [[Variable(row, col) for col in range(9)] for row in range(9)]
+    Attributes:
+        grid (list): A 9x9 list representing the Sudoku grid.
+                    0 indicates an empty cell.
+        domains (list): A 9x9 list of sets, where each set represents
+                       the possible values for a cell in the grid.
+    """
+    def __init__(self, grid=None):
+        """
+       Initializes the Sudoku grid and domains.
+
+       Args:
+           grid (list, optional): A pre-filled Sudoku grid. If not
+                                  provided, a new empty grid is created.
+                                  Defaults to None.
+       """
+        # Initialize the Sudoku grid and domains
+        self.grid = [[0] * 9 for _ in range(9)] if grid is None else grid
+        self.domains = [[{self.grid[i][j]} if self.grid[i][j] != 0 else set(range(1, 10)) for j in range(9)] for i in range(9)]
+        self.initialize_domains()
+        self.arcs = self.define_arcs()  # Get all arcs
 
     def initialize_domains(self):
-        for row in range(9):
-            for col in range(9):
-                if self.board[row][col] != 0:
-                    self.variables[row][col].domain = [self.board[row][col]]
-
-    def backtracking(self):
-        empty = self.find_empty_location()
-        if not empty:
-            return True  # Puzzle solved. 
-        row, col = empty
-
-        for num in range(1, 10):
-            if self.is_valid(row, col, num):
-                self.board[row][col] = num
-                if self.backtracking():
-                    return True
-                self.board[row][col] = 0  # Backtrack
-
-        return False
-    
-    def is_valid(self, row, col, num):
-    # Check if num is not in the current row, column, and 3x3 subgrid
-        for i in range(9):
-            if self.board[row][i] == num or self.board[i][col] == num:
-                return False
-        start_row, start_col = 3 * (row // 3), 3 * (col // 3)
-        for i in range(start_row, start_row + 3):
-            for j in range(start_col, start_col + 3):
-                if self.board[i][j] == num:
-                    return False
-        return True
-
-    def find_empty_location(self):
-    #any location with zero is empty 
-        for row in range(9):
-            for col in range(9):
-                if self.board[row][col] == 0:
-                    return (row, col)
-        return None    
-
-    def is_consistent(self, var, value):
-        # Check if value is not in the current row, column, and 3x3 subgrid
-        for i in range(9):
-            if self.board[var.row][i] == value or self.board[i][var.col] == value:
-                return False
-        start_row, start_col = 3 * (var.row // 3), 3 * (var.col // 3)
-        for i in range(start_row + 3):
-            for j in range(start_col + 3):
-                if self.board[i][j] == value:
-                    return False
-        return True
-
-    def arc_consistency(self):
-        queue = [(var, neighbor) for row in self.variables for var in row for neighbor in self.get_neighbors(var)]
-        while queue:
-            var, neighbor = queue.pop(0)
-            if self.revise(var, neighbor):
-                if len(var.domain) == 0:
-                    return False
-                for neighbor in self.get_neighbors(var):
-                    queue.append((neighbor, var))
-        return True
-
-    def revise(self, var, neighbor):
         """
-        Revise the domain of a variable to ensure consistency with a neighboring variable.
+        Initializes the domains for each cell in the grid.
 
-        Args:
-            var (Variable): The variable whose domain is to be revised.
-            neighbor (Variable): The neighboring variable to check for consistency.
+        - If a cell has a pre-filled value, its domain is set to that value only.
+        - If a cell is empty, its domain is set to all possible values (1-9).
+        """
+        for i in range(9):
+            for j in range(9):
+                if self.grid[i][j] != 0:
+                    self.domains[i][j] = {self.grid[i][j]}
+                else:
+                    self.domains[i][j] = set(range(1, 10))
+
+    def define_arcs(self):
+        """
+        Defines all the arcs (constraints) in the Sudoku grid.
+
+        An arc connects two cells, indicating that the values in those cells
+        cannot be the same. This ensures that each row, column, and 3x3 subgrid
+        has unique values.
 
         Returns:
-            bool: True if the domain of the variable was revised, False otherwise.
+            list: A list of tuples representing the arcs in the grid.
+        """
+        arcs = []
+        for i in range(9):
+            for j in range(9):
+                for k in range(9):
+                    if j != k:
+                        arcs.append(((i, j), (i, k)))
+                for k in range(9):
+                    if i != k:
+                        arcs.append(((i, j), (k, j)))
+        for box_row in range(3):
+            for box_col in range(3):
+                for i in range(3):
+                    for j in range(3):
+                        for k in range(3):
+                            for l in range(3):
+                                if (i, j) != (k, l):
+                                    arcs.append(((box_row * 3 + i, box_col * 3 + j), (box_row * 3 + k, box_col * 3 + l)))
+        return arcs
+
+    def apply_arc_consistency(self):
+        """
+        Applies Arc Consistency to the Sudoku grid.
+
+        Arc Consistency ensures that no cell has a value in its domain that
+        already exists in a related cell (connected by an arc). This reduces
+        the number of possible values for each cell, potentially leading to
+        faster solving.
+        """
+        changed = True
+        while changed:
+            changed = False
+            for (xi, xj) in self.arcs:
+                if self.revise(xi, xj):
+                    changed = True
+        self.update_grid()
+
+    def revise(self, xi, xj):
+        """
+        Revises the domain of cell xi based on the constraints with cell xj.
+
+        This function checks if any value in the domain of xi can be eliminated
+        because it already exists in cell xj. If such a value is found, it's
+        removed from the domain of xi.
+
+        Args:
+            xi (tuple): Coordinates of cell xi (row, col).
+            xj (tuple): Coordinates of cell xj (row, col).
+
+        Returns:
+            bool: True if the domain of xi was revised, False otherwise.
         """
         revised = False
-        for value in var.domain:
-            if not any(self.is_consistent(neighbor, value) for value in neighbor.domain):
-                var.domain.remove(value)
+        for value in list(self.domains[xi[0]][xi[1]]):
+            if not any(value != v for v in self.domains[xj[0]][xj[1]]):
+                self.domains[xi[0]][xi[1]].remove(value)
                 revised = True
         return revised
 
-    def solve(self):
-        if self.arc_consistency():
-            for row in range(9):
-                for col in range(9):
-                    if len(self.variables[row][col].domain) == 1:
-                        self.board[row][col] = self.variables[row][col].domain[0]
-            return self.board
+    def get_degree(self, row, col):
+        """Calculates the degree of a cell in a Sudoku grid."""
+        degree = 0
+        for i in range(9):
+            if self.grid[row][i] == 0 and i != col:  # Check row
+                degree += 1
+            if self.grid[i][col] == 0 and i != row:  # Check column
+                degree += 1
+
+        box_x = col // 3
+        box_y = row // 3
+        for i in range(box_y * 3, box_y * 3 + 3):
+            for j in range(box_x * 3, box_x * 3 + 3):
+                if self.grid[i][j] == 0 and (i, j) != (row, col):  # Check box
+                    degree += 1
+        return degree
+
+    def solve_sudoku(self):
+        """Recursive backtracking solver with MRV and Degree Heuristic."""
+        self.apply_arc_consistency()
+        if any(len(self.domains[i][j]) == 0 for i in range(9) for j in range(9)):
+            return False  # Base case: Empty domain, no solution possible
+        mrv_cell = self.get_mrv()
+        if not mrv_cell:
+            return True  # Base case: No empty cells, puzzle solved
         else:
-            return None
-            
-    def generate_board(self):
-        self.board = [[0 for _ in range(9)] for _ in range(9)]
-        for _ in range(17):  # Fill 17 cells to ensure a unique solution
-            # choose a random cell
-            row, col = random.randint(0, 8), random.randint(0, 8)
-            # make sure the generated cell is empty
-            while self.board[row][col] != 0:
-                row, col = random.randint(0, 8), random.randint(0, 8)
-            # generate a random number between 1 and 9
-            num = random.randint(1, 9)
-            # make sure the generated number is consistent with the board
-            while not self.is_consistent(Variable(row, col), num):
-                num = random.randint(1, 9)
-            self.board[row][col] = num
+            row, col = mrv_cell
+
+        for num in list(self.domains[row][col]):  # Iterate through a copy of the domain
+            if self.is_valid(self.grid, num, (row, col)):
+                self.grid[row][col] = num
+                original_domains = copy.deepcopy(self.domains)  # Store the original domains
+                self.domains[row][col] = {num}  # Update the domain of the current cell
+
+                for i in range(9):  # Update the domains of the related cells
+                    if num in self.domains[row][i] and i != col:
+                        self.domains[row][i].discard(num)
+                    if num in self.domains[i][col] and i != row:
+                        self.domains[i][col].discard(num)
+                box_x = col // 3
+                box_y = row // 3
+                for i in range(box_y * 3, box_y * 3 + 3):
+                    for j in range(box_x * 3, box_x * 3 + 3):
+                        if num in self.domains[i][j] and (i, j) != (row, col):
+                            self.domains[i][j].discard(num)
+
+                if self.solve_sudoku():  # Recursive call
+                    return True
+
+                self.grid[row][col] = 0  # Backtrack
+                self.domains = original_domains  # Restore the original domains
+        return False
+
+    def is_valid(self, grid, num, pos):
+        """Checks if placing 'num' at 'pos' is valid."""
+        # Check row
+        for i in range(len(grid[0])):
+            if grid[pos[0]][i] == num and pos[1] != i:
+                return False
+
+        # Check column
+        for i in range(len(grid)):
+            if grid[i][pos[1]] == num and pos[0] != i:
+                return False
+
+        # Check box
+        box_x = pos[1] // 3
+        box_y = pos[0] // 3
+
+        for i in range(box_y * 3, box_y * 3 + 3):
+            for j in range(box_x * 3, box_x * 3 + 3):
+                if grid[i][j] == num and (i, j) != pos:
+                    return False
+
+        return True
+
+    def get_mrv(self):
+        """Gets the cell with the Minimum Remaining Values."""
+        min_remaining = 10  # Start with a value greater than any possible domain size
+        mrv_cell = None
+
+        for i in range(9):
+            for j in range(9):
+                if self.grid[i][j] == 0:
+                    remaining_values = len(self.domains[i][j])
+                    if remaining_values < min_remaining:
+                        min_remaining = remaining_values
+                        mrv_cell = (i, j)
+                    elif remaining_values == min_remaining and mrv_cell is not None:
+                        if self.get_degree(i, j) > self.get_degree(mrv_cell[0], mrv_cell[1]):
+                            mrv_cell = (i, j)
+        return mrv_cell
+
+    def update_grid(self):
+        for i in range(9):
+            for j in range(9):
+                if len(self.domains[i][j]) == 1:
+                    self.grid[i][j] = next(iter(self.domains[i][j]))
+
+    def print_domains(self):
+        # Print the current domains for each cell
+        print("Current Domains:")
+        for i in range(9):
+            print([sorted(list(self.domains[i][j])) for j in range(9)])
+        print()
+
+    def print_grid(self):
+        # Print the Sudoku grid
+        for row in self.grid:
+            print(" ".join(str(num) if num != 0 else "_" for num in row))
+        print()
+    
+    def generate_puzzle(self, difficilty):
+        if difficilty == "easy":
+            puzzle = str(generators.random_sudoku(avg_rank=5))
+        elif difficilty == "mid": 
+            puzzle = str(generators.random_sudoku(avg_rank=100))
+        elif difficilty == "hard":
+            puzzle = str(generators.random_sudoku(avg_rank=150))
+        else:
+            puzzle = str(generators.random_sudoku(avg_rank=100))
+        self.grid = [list(map(int, puzzle[i:i+9])) for i in range(0, 81, 9)]
         self.initialize_domains()
 
 if __name__ == "__main__":
-    # sudoku = Sudoku()
-    # solved_board = sudoku.backtracking(sudoku.board)
-    # if solved_board:
-    #     for row in solved_board:
-    #         print(row)
-    # else:
-    #     print("No solution found.")
-    baba =  Variable(0,0)
-    print(baba.neighbors)
-
+    grid = [[0, 0, 3, 0, 0, 0, 0, 0, 0],
+        [8, 0, 9, 4, 6, 0, 7, 0, 2],
+        [2, 0, 0, 0, 1, 8, 6, 0, 0],
+        [0, 0, 0, 0, 0, 6, 0, 7, 0],
+        [0, 0, 8, 0, 0, 0, 4, 0, 0],
+        [0, 7, 0, 8, 0, 0, 0, 0, 0],
+        [0, 0, 2, 9, 4, 0, 0, 0, 5],
+        [4, 0, 6, 0, 3, 2, 8, 0, 7],
+        [0, 0, 0, 0, 0, 0, 2, 0, 0]]
+    sudoku = Sudoku(grid)
+    # sudoku.generate_puzzle("hard")
+    # print("Puzzle:", sudoku.grid)
+    print("Solving:")
+    sudoku.print_grid()
+    if sudoku.solve_sudoku():
+        print("Solution:")
+        for row in sudoku.grid:
+            print(row)
+    else:   
+        print("No solution found.")
