@@ -244,31 +244,31 @@ class Sudoku:
             self.initialize_domains()
 
 
-# if __name__ == "__main__":
-#     # grid3 = [[0, 5, 0, 1, 0, 9, 0, 0, 0],
-#     #         [0, 9, 0, 2, 0, 0, 0, 0, 7],
-#     #         [6, 2, 4, 0, 5, 7, 0, 0, 0],
-#     #         [0, 0, 8, 0, 0, 0, 6, 7, 0],
-#     #         [0, 0, 0, 5, 0, 0, 0, 2, 0],
-#     #         [0, 7, 0, 0, 0, 0, 0, 3, 0],
-#     #         [0, 8, 2, 0, 4, 1, 0, 0, 0],
-#     #         [0, 0, 5, 7, 3, 0, 0, 0, 1],
-#     #         [0, 3, 0, 0, 0, 0, 0, 0, 0]]
-#     sudoku = Sudoku()
-#     sudoku.generate_puzzle("mid")
-#     # print("Puzzle:", sudoku.grid)
-#     print("Solving:")
-#     sudoku.print_grid()
-#     if sudoku.solve_sudoku():
-#         print("Solution:")
-#         for row in sudoku.grid:
-#             print(row)
-#     else:   
-#         print("No solution found.")
-#     print("\n")
-#     for grid in sudoku.grid_history:
-#         for row in grid:
-#             print(row)
-#         print()
+if __name__ == "__main__":
+    grid3 = [[0, 5, 0, 1, 0, 9, 0, 0, 0],
+            [0, 9, 0, 2, 0, 0, 0, 0, 7],
+            [6, 2, 4, 0, 5, 7, 0, 0, 0],
+            [0, 0, 8, 0, 0, 0, 6, 7, 0],
+            [0, 0, 0, 5, 0, 0, 0, 2, 0],
+            [0, 7, 0, 0, 0, 0, 0, 3, 0],
+            [0, 8, 2, 0, 4, 1, 0, 0, 0],
+            [0, 0, 5, 7, 3, 0, 0, 0, 1],
+            [0, 3, 0, 0, 0, 0, 0, 0, 0]]
+    sudoku = Sudoku()
+    sudoku.generate_puzzle("mid")
+    # print("Puzzle:", sudoku.grid)
+    print("Solving:")
+    sudoku.print_grid()
+    if sudoku.solve_sudoku():
+        print("Solution:")
+        for row in sudoku.grid:
+            print(row)
+    else:   
+        print("No solution found.")
+    print("\n")
+    for grid in sudoku.grid_history:
+        for row in grid:
+            print(row)
+        print()
 
 

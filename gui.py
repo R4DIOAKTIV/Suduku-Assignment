@@ -1,7 +1,7 @@
 import tkinter as tk
 from tkinter import messagebox, ttk
 from main import Sudoku
-
+import time
 class SudokuGUI:
     def __init__(self, root):
         self.root = root
@@ -108,7 +108,10 @@ class SudokuGUI:
     def solve(self):
         board = self.get_board()
         self.sudoku = Sudoku(board)
+        start_time = time.time()
         if self.sudoku.solve_sudoku():
+            end_time = time.time()
+            print(f"Solved in {end_time - start_time:.4f} seconds.")
             self.set_board(self.sudoku.grid)
         else:
             messagebox.showerror("Error", "No solution found.")
