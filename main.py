@@ -1,5 +1,6 @@
 from dokusan import generators
 import copy
+import numpy as np
 class Sudoku:
     """
     Represents a Sudoku puzzle.
@@ -20,10 +21,12 @@ class Sudoku:
                                   Defaults to None.
        """
         # Initialize the Sudoku grid and domains
-        self.grid = [[0] * 9 for _ in range(9)] if grid is None else grid
-        self.domains = [[{self.grid[i][j]} if self.grid[i][j] != 0 else set(range(1, 10)) for j in range(9)] for i in range(9)]
+        self.grid = grid if grid else [[0] * 9 for _ in range(9)]
+        self.domains = [[set(range(1, 10)) for _ in range(9)] for _ in range(9)]
         self.initialize_domains()
         self.arcs = self.define_arcs()  # Get all arcs
+        self.grid_history = [copy.deepcopy(self.grid)]
+        self.domains_history = [copy.deepcopy(self.domains)]
 
     def initialize_domains(self):
         """
@@ -85,13 +88,15 @@ class Sudoku:
                 if self.revise(xi, xj):
                     changed = True
         self.update_grid()
+        self.grid_history.append(copy.deepcopy(self.grid))
+        self.domains_history.append(copy.deepcopy(self.domains))
 
     def revise(self, xi, xj):
         """
         Revises the domain of cell xi based on the constraints with cell xj.
 
         This function checks if any value in the domain of xi can be eliminated
-        because it already exists in cell xj. If such a value is found, it's
+        because it can't form a pair with values in xj. If such a value is found, it's
         removed from the domain of xi.
 
         Args:
@@ -124,9 +129,15 @@ class Sudoku:
                 if self.grid[i][j] == 0 and (i, j) != (row, col):  # Check box
                     degree += 1
         return degree
+    
+
+    # def solve_sudoku(self):
+    #     """Recursive arc consistency backtracking solver with MRV and Degree Heuristic."""
+    #     self.apply_arc_consistency()
+    #     return self.solve_sudoku_recursive()
 
     def solve_sudoku(self):
-        """Recursive backtracking solver with MRV and Degree Heuristic."""
+        """Recursive arc consistency backtracking solver with MRV and Degree Heuristic."""
         self.apply_arc_consistency()
         if any(len(self.domains[i][j]) == 0 for i in range(9) for j in range(9)):
             return False  # Base case: Empty domain, no solution possible
@@ -140,8 +151,6 @@ class Sudoku:
             if self.is_valid(self.grid, num, (row, col)):
                 self.grid[row][col] = num
                 original_domains = copy.deepcopy(self.domains)  # Store the original domains
-                self.domains[row][col] = {num}  # Update the domain of the current cell
-
                 for i in range(9):  # Update the domains of the related cells
                     if num in self.domains[row][i] and i != col:
                         self.domains[row][i].discard(num)
@@ -153,14 +162,16 @@ class Sudoku:
                     for j in range(box_x * 3, box_x * 3 + 3):
                         if num in self.domains[i][j] and (i, j) != (row, col):
                             self.domains[i][j].discard(num)
-
+                self.domains[row][col] = {num}  # Update the domain of the current cell
+                self.grid_history.append(copy.deepcopy(self.grid))
+                self.domains_history.append(copy.deepcopy(self.domains))
                 if self.solve_sudoku():  # Recursive call
                     return True
 
                 self.grid[row][col] = 0  # Backtrack
                 self.domains = original_domains  # Restore the original domains
         return False
-
+    
     def is_valid(self, grid, num, pos):
         """Checks if placing 'num' at 'pos' is valid."""
         # Check row
@@ -219,38 +230,45 @@ class Sudoku:
         for row in self.grid:
             print(" ".join(str(num) if num != 0 else "_" for num in row))
         print()
-    
+        
     def generate_puzzle(self, difficilty):
-        if difficilty == "easy":
-            puzzle = str(generators.random_sudoku(avg_rank=5))
-        elif difficilty == "mid": 
-            puzzle = str(generators.random_sudoku(avg_rank=100))
-        elif difficilty == "hard":
-            puzzle = str(generators.random_sudoku(avg_rank=150))
-        else:
-            puzzle = str(generators.random_sudoku(avg_rank=100))
-        self.grid = [list(map(int, puzzle[i:i+9])) for i in range(0, 81, 9)]
-        self.initialize_domains()
+            if difficilty == "easy":
+                puzzle = str(generators.random_sudoku(avg_rank=50))
+            elif difficilty == "mid": 
+                puzzle = str(generators.random_sudoku(avg_rank=100))
+            elif difficilty == "hard":
+                puzzle = str(generators.random_sudoku(avg_rank=150))
+            else:
+                puzzle = str(generators.random_sudoku(avg_rank=250))
+            self.grid = [list(map(int, puzzle[i:i+9])) for i in range(0, 81, 9)]
+            self.initialize_domains()
 
 
-if __name__ == "__main__":
-    grid = [[0, 0, 3, 0, 0, 0, 0, 0, 0],
-        [8, 0, 9, 4, 6, 0, 7, 0, 2],
-        [2, 0, 0, 0, 1, 8, 6, 0, 0],
-        [0, 0, 0, 0, 0, 6, 0, 7, 0],
-        [0, 0, 8, 0, 0, 0, 4, 0, 0],
-        [0, 7, 0, 8, 0, 0, 0, 0, 0],
-        [0, 0, 2, 9, 4, 0, 0, 0, 5],
-        [4, 0, 6, 0, 3, 2, 8, 0, 7],
-        [0, 0, 0, 0, 0, 0, 2, 0, 0]]
-    sudoku = Sudoku(grid)
-    # sudoku.generate_puzzle("hard")
-    # print("Puzzle:", sudoku.grid)
-    print("Solving:")
-    sudoku.print_grid()
-    if sudoku.solve_sudoku():
-        print("Solution:")
-        for row in sudoku.grid:
-            print(row)
-    else:   
-        print("No solution found.")
+# if __name__ == "__main__":
+#     # grid3 = [[0, 5, 0, 1, 0, 9, 0, 0, 0],
+#     #         [0, 9, 0, 2, 0, 0, 0, 0, 7],
+#     #         [6, 2, 4, 0, 5, 7, 0, 0, 0],
+#     #         [0, 0, 8, 0, 0, 0, 6, 7, 0],
+#     #         [0, 0, 0, 5, 0, 0, 0, 2, 0],
+#     #         [0, 7, 0, 0, 0, 0, 0, 3, 0],
+#     #         [0, 8, 2, 0, 4, 1, 0, 0, 0],
+#     #         [0, 0, 5, 7, 3, 0, 0, 0, 1],
+#     #         [0, 3, 0, 0, 0, 0, 0, 0, 0]]
+#     sudoku = Sudoku()
+#     sudoku.generate_puzzle("mid")
+#     # print("Puzzle:", sudoku.grid)
+#     print("Solving:")
+#     sudoku.print_grid()
+#     if sudoku.solve_sudoku():
+#         print("Solution:")
+#         for row in sudoku.grid:
+#             print(row)
+#     else:   
+#         print("No solution found.")
+#     print("\n")
+#     for grid in sudoku.grid_history:
+#         for row in grid:
+#             print(row)
+#         print()
+
+
